@@ -1,202 +1,149 @@
-// Load Wi-Fi library
-
 #include <WiFi.h>
-
 #include <WebSocketsServer.h>
+#include <Servo.h>
 
+//Opretter servomotrer til at kører og til at styre
+Servo servoMove;
+Servo servoSteer;
 
+//Variabler som holder styr på dele af programmet
+char first_char; //Benyttes til at skive WebSocket-input ind i
+int LEDto = 0; //Holder øje med timing af LED
+bool LEDstate = false; //Holder øje med, hvordan LED skal være
+int turn = 1; //Holder øje med position af roret (0, 1 eller 2)
+int turnValue = 90; //Holder øje med værdi af ror således at den kan bevæge sig langsomt
 
-
+//Opretter WebSocketServer
 WebSocketsServer webSocket = WebSocketsServer(81);
 
+//Info om nettet den skal oprette forbindelse til
+const char* ssid = "HUAWEI-P10lite";
+const char* password = "42408556";
 
-
-// Replace with your network credentials
-
-const char* ssid = "Vores_internet";
-
-const char* password = "*************";
-
-// Select LED output pin
-
-#define LED_PIN  16
-
-
-
-void hexdump(const void *mem, uint32_t len, uint8_t cols = 16) {
-
-  const uint8_t* src = (const uint8_t*) mem;
-
-  Serial.printf("\n[HEXDUMP] Address: 0x%08X len: 0x%X (%d)", (ptrdiff_t)src, len, len);
-
-  for (uint32_t i = 0; i < len; i++) {
-
-    if (i % cols == 0) {
-
-      Serial.printf("\n[0x%08X] 0x%08X: ", (ptrdiff_t)src, i);
-
-    }
-
-    Serial.printf("%02X ", *src);
-
-    src++;
-
-  }
-
-  Serial.printf("\n");
-
-}
-
-
+//Definere ben komponenter sidder på
+#define LED_PIN 16
+#define servoMovePin 17
+#define servoSteerPin 21
 
 void webSocketEvent(uint8_t num, WStype_t type, uint8_t * payload, size_t length) {
-
-
-
+    //Får WebSocket input og bruger switch-case alt efter type. Case'ne er enum typer.
     switch(type) {
-
         case WStype_DISCONNECTED:
 
             Serial.printf("[%u] Disconnected!\n", num);
-
+            digitalWrite(LED_PIN,LOW);
+            servoMove.write(90);
+            servoSteer.write(90);
             break;
 
         case WStype_CONNECTED:
 
             {
-
                 IPAddress ip = webSocket.remoteIP(num);
-
                 Serial.printf("[%u] Connected from %d.%d.%d.%d url: %s\n", num, ip[0], ip[1], ip[2], ip[3], payload);
-
-
-
-        // send message to client
-
-        webSocket.sendTXT(num, "Connected");
-
+                digitalWrite(LED_PIN,HIGH);
             }
-
             break;
 
         case WStype_TEXT:
-
-            Serial.printf("[%u] get Text: %s\n", num, payload);
-            //const char* ettal = "1";
-            if (strcmp((char*)payload, "1") == 0) {
-              digitalWrite(LED_PIN,HIGH);
+            Serial.printf("[%u] input: %s\n", num, payload);
+            first_char = (char)payload[0];
+            if (first_char == 'f') {
+              Serial.println("Moving forward");
+              servoMove.write(110);
+              turn = 1;
+              LEDstate = true;
+            } else if (first_char == 's') {
+              Serial.println("Stopping");
+              servoMove.write(90);
+              turn = 1;
+              LEDstate = false;
+            } else if (first_char == 'b') {
+              Serial.println("Backing up");
+              servoMove.write(70);
+              turn = 1;
+              LEDstate = true;
+            } else if (first_char == 'r') {
+              Serial.println("Backing up");
+              servoMove.write(110);
+              turn = 0;
+              LEDstate = true;
+            } else if (first_char == 'l') {
+              Serial.println("Backing up");
+              servoMove.write(110);
+              turn = 2;
+              LEDstate = true;
             } else {
-              digitalWrite(LED_PIN,LOW);
+              Serial.println("ABORT");
+              servoMove.write(90);
+              turn = 1;
+              LEDstate = false;
             }
-
-            // send message to client
-
-            // webSocket.sendTXT(num, "message here");
-
-
-
-            // send data to all connected clients
-
-            // webSocket.broadcastTXT("message here");
-
             break;
-
-        case WStype_BIN:
-
-            Serial.printf("[%u] get binary length: %u\n", num, length);
-
-            hexdump(payload, length);
-
-
-
-            // send message to client
-
-            // webSocket.sendBIN(num, payload, length);
-
-            break;
-
-    case WStype_ERROR:      
-
-    case WStype_FRAGMENT_TEXT_START:
-
-    case WStype_FRAGMENT_BIN_START:
-
-    case WStype_FRAGMENT:
-
-    case WStype_FRAGMENT_FIN:
-
-      break;
 
     }
-
-
-
 }
 
-
-
 void setup() {
-
   Serial.begin(9600);
 
-
-
-  // Connect to Wi-Fi network with SSID and password
-
+  //Starter med at oprette fobindelse til WebSocket-internet
   Serial.print("Connecting to ");
-
   Serial.println(ssid);
-
   WiFi.begin(ssid, password);
 
+  //Skriver Serial prikker ind til forbindelsen er oprettet
   while (WiFi.status() != WL_CONNECTED) {
-
     delay(500);
-
     Serial.print(".");
-
   }
 
   // Print local IP address
-
-  Serial.println("");
-
-  Serial.println("WiFi connected.");
-
-  Serial.println("IP address: ");
-
+  Serial.println("\nWiFi connected - IP address: ");
   Serial.println(WiFi.localIP());
 
-
-
-  // server address, port and URL
-
+  //Opretter forbindelse til p5.js
   webSocket.begin();
-
-
-
-  // event handler
-
   webSocket.onEvent(webSocketEvent);
 
-  //LED
-  pinMode(LED_PIN,INPUT);
+  //LED setup
+  pinMode(LED_PIN,OUTPUT);
 
+  //Servo setup
+  servoMove.attach(servoMovePin);
+  servoSteer.attach(servoSteerPin);
+  servoMove.write(90);
+  servoSteer.write(90);
 }
 
-
-
-unsigned long timer = 0;
-
-int counter = 0;
-
-
-
 void loop() {
-
+  //Modtag input hvert loop
   webSocket.loop();
 
-  
+  //Styrer LED som blinker, hvis bilen kører, lyser konstant hvis der er forbindelse via WebSocket og ellers slukket
+  if (LEDstate) {
+    if (millis() >= LEDto) {
+      LEDto = millis() + 2000;
+    } else if (LEDto - millis() < 1000) {
+      digitalWrite(LED_PIN,LOW);
+    } else {
+      digitalWrite(LED_PIN,HIGH);
+    }
+  }
 
-
+  //Blødgør at båden ror drejer langsomt og mindre voldsomt
+  if (turn == 0 && turnValue > 30) {
+    turnValue--;
+    delay(20);
+  } else if (turn == 1 && turnValue > 90) {
+    turnValue--;
+    delay(40);
+  } else if (turn == 1 && turnValue < 90) {
+    turnValue++;
+    delay(20);
+  } else if (turn == 2 && turnValue < 120) {
+    turnValue++;
+    delay(40);
+  }
+  servoSteer.write(turnValue);
 }
