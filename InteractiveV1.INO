@@ -22,8 +22,8 @@ double compass; //Gemmer kompasretning - normalt fortæller MPU'en kun forskelle
 int compassWait; //Tæller millis for hvor hurtigt heading skal sendes
 
 //Info om nettet den skal oprette forbindelse til
-const char* ssid = "HUAWEI-P10lite";
-const char* password = "42408556";
+const char* ssid = "";
+const char* password = "";
 
 //Definere ben komponenter sidder på
 #define LED_PIN 16
